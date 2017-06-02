@@ -88,6 +88,28 @@ int main()
     std::cout << "pi: " << pi << std::endl;
     std::cout << "*******************************" << std::endl;
 
+    // parallel calculation version 3 ( using parallel for )
+
+    sum = 0;
+    area = 0;
+    numSteps = 100000;
+    a = 0.0;
+    b = 1.0;
+    dx = ( b - a ) / numSteps;
+    
+    #pragma omp parallel for num_threads( NUM_THREADS ) private( q ) reduction(+:sum)
+    for ( q = 0; q < numSteps; q++ )
+    {
+        double x_q = a + ( q + 0.5 ) * dx;
+        double f_xq = 4.0 / ( 1 + x_q * x_q );
+        sum += f_xq;
+    }
+
+    area = sum * dx;
+
+    std::cout << "PARALLEL CALCULATION V3 ********" << std::endl;
+    std::cout << "pi: " << area << std::endl;
+    std::cout << "********************************" << std::endl;
 
     return 0;
 }
