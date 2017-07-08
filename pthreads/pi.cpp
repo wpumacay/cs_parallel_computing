@@ -10,16 +10,20 @@ void* Thread_sum( void* rank );
 double sum = 0.0;
 double pi = 0.0;
 
-int current_executor = 0;
+// int current_executor = 0;
 
 #define N 1000000
 #define NUM_THREADS 10
+
+pthread_mutex_t mutex;
 
 int main()
 {
     pthread_t* _thread_handles = new pthread_t[NUM_THREADS];
 
-    current_executor = 0;
+    // current_executor = 0;
+
+    pthread_mutex_init( &mutex, NULL );
 
     long q;
     for ( q = 0; q < NUM_THREADS; q++ )
@@ -62,9 +66,11 @@ void* Thread_sum( void* rank )
         local_sum += factor * ( 1. / ( 2 * _q + 1 ) );
     }
 
-    while( current_executor != local_id );// busy waiting
+    // while( current_executor != local_id );// busy waiting
+    pthread_mutex_lock( &mutex );
     sum += local_sum;
-    current_executor = ( current_executor + 1 ) % NUM_THREADS;
+    pthread_mutex_unlock( &mutex );
+    // current_executor = ( current_executor + 1 ) % NUM_THREADS;
 
     return NULL;
 }

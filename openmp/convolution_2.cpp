@@ -7,17 +7,19 @@
 #define WINDOW_SIZE 5
 #define DELTA ( WINDOW_SIZE - 1 ) / 2
 
-double matrix[MATRIX_SIZE_2][MATRIX_SIZE_2];
-double result_matrix[MATRIX_SIZE_2][MATRIX_SIZE_2];
+float matrix[MATRIX_SIZE_2][MATRIX_SIZE_2];
+float result_matrix[MATRIX_SIZE_2][MATRIX_SIZE_2];
 
-double* _matrix;
-double* _result_matrix;
+float* _matrix;
+float* _result_matrix;
 
-void convolution( double* matIn, double* matOut );
+float convolution( float* matIn, float* matOut );
 
-void printMatrix( double* mat );
+void printMatrix( float* mat );
 
 #define NUM_THREADS 4
+#define SERIAL_TIME_O0 3.88098
+#define SERIAL_TIME 1.24023
 
 using namespace std;
 
@@ -25,8 +27,8 @@ int main()
 {
     cout << "init" << endl;
 
-    _matrix = new double[(long long) ( MATRIX_SIZE_2 * MATRIX_SIZE_2 )];
-    _result_matrix = new double[(long long) ( MATRIX_SIZE_2 * MATRIX_SIZE_2 )];
+    _matrix = new float[(long long) ( MATRIX_SIZE_2 * MATRIX_SIZE_2 )];
+    _result_matrix = new float[(long long) ( MATRIX_SIZE_2 * MATRIX_SIZE_2 )];
 
     cout << "initialized new arrays" << endl;
 
@@ -51,14 +53,16 @@ int main()
     }
 
     cout << "calculating convolution" << endl;
-    convolution( ( double * )matrix, ( double * )result_matrix );
+    float delta = convolution( ( float * )matrix, ( float * )result_matrix );
+    cout << "efficiency: " << ( SERIAL_TIME / delta ) / NUM_THREADS << endl;
+    cout << "speedup: " << ( SERIAL_TIME / delta ) << endl;
     // convolution( _matrix, _result_matrix ); 
     cout << "printing matrix" << endl;
-    // printMatrix( _matrix );
-    // printMatrix( _result_matrix );
+    // printMatrix( (float*)matrix );
+    // printMatrix( (float*)result_matrix );
 }
 
-void printMatrix( double *mat )
+void printMatrix( float *mat )
 {
     int row, col;
     for( row = 0; row < MATRIX_SIZE; row++ )
@@ -72,16 +76,19 @@ void printMatrix( double *mat )
 }
 
 
-void convolution( double* matIn, double* matOut )
+float convolution( float* matIn, float* matOut )
 {
     /// int my_id = omp_get_thread_num();
-    double t1 = omp_get_wtime();
+    float t1 = omp_get_wtime();
 
     int row, col;
+    omp_set_num_threads( NUM_THREADS );
+    #pragma omp parallel private( row, col )
     for( row = 0; row < MATRIX_SIZE; row++ )
     {
-        omp_set_num_threads( NUM_THREADS );
-        #pragma omp parallel for
+        // omp_set_num_threads( NUM_THREADS );
+        // #pragma omp parallel for
+        #pragma omp for
         for( col = 0; col < MATRIX_SIZE; col++ )
         {
             int _left = ( col - DELTA >= 0 ? col - DELTA : 0 );
@@ -90,7 +97,7 @@ void convolution( double* matIn, double* matOut )
             int _bottom = ( row + DELTA <= MATRIX_SIZE - 1 ? row + DELTA : MATRIX_SIZE - 1 );
 
             int _row, _col;
-            double _sum = 0.0;
+            float _sum = 0.0;
             int count = 0;
             for ( _row = _top; _row <= _bottom; _row++ )
             {
@@ -104,6 +111,7 @@ void convolution( double* matIn, double* matOut )
         }
     }
 
-    double t2 = omp_get_wtime();
+    float t2 = omp_get_wtime();
     std::cout << "delta: " << t2 - t1 << std::endl;
+    return t2 - t1;
 }
