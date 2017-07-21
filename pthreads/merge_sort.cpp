@@ -14,7 +14,7 @@
 using namespace std;
 
 #define VECT_SIZE 10000000
-#define NUM_THREADS 4
+#define NUM_THREADS 7
 
 #define SERIAL_TIME 43.218
 
