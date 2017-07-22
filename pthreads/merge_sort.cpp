@@ -13,7 +13,7 @@
 
 using namespace std;
 
-#define VECT_SIZE 10000000
+#define VECT_SIZE 100
 #define NUM_THREADS 7
 
 #define SERIAL_TIME 43.218
@@ -23,10 +23,13 @@ using namespace std;
 
 // GLOBAL ARRAY TO SORT
 vector<double> g_arr;
+vector<double> g_arr_aux;
 vector<double> g_arr_db;
 
 template<class T>
 void merge( vector<T> &vect, long int _left, long int _mid, long int _right );
+template<class T>
+void merge_parallel( vector<T> &vect, vector<T> &vect_aux, long int _left, long int _mid, long int _right );
 
 template<class T>
 bool isSorted( vector<T> &vect )
@@ -76,7 +79,6 @@ struct WorkStruct
     int curr_size;
     int right_max;
     int vect_size;
-    bool test;
 };
 
 void* Pth_merge_sort_work_chunk( void* working_struct )
@@ -88,8 +90,7 @@ void* Pth_merge_sort_work_chunk( void* working_struct )
     long int _right_max = _wchunk->right_max;
     long int _vect_size  = _wchunk->vect_size;
     long _rank = _wchunk->rank;
-    bool _test = _wchunk->test;
-    // cout << "vect size: " << _vect_size << endl;
+
     for ( _left_start = _wchunk->left_start; _left_start <= _right_max; _left_start += 2 * _curr_size )
     {
         long int _mid = _left_start + _curr_size - 1;
@@ -98,26 +99,14 @@ void* Pth_merge_sort_work_chunk( void* working_struct )
 
         if ( _right_end < _mid )
         {
-            // cout << "???: " << _left_start << " - " << _mid << " - " << _right_end << endl;
             _mid = ( _left_start + _right_end ) / 2;
         }
-        if ( _right_end > _vect_size )
-        {
-            cout << "????: " << _right_end << endl;
-        }
-        //if ( _test )
-        //{
-        //    merge( g_arr_db, _left_start, _mid, _right_end );
-        //}
-        //else
-        //{
-            merge( g_arr, _left_start, _mid, _right_end );
-        //}
+        merge_parallel( g_arr, g_arr_aux, _left_start, _mid, _right_end );
     }
 }
 
 template<class T>
-void merge_sort_parallel( vector<T> &vect, bool test = false )
+void merge_sort_parallel( vector<T> &vect, vector<T> &vect_aux )
 {
     long int _curr_size;
     long int len_vect = vect.size();
@@ -147,27 +136,58 @@ void merge_sort_parallel( vector<T> &vect, bool test = false )
             _wchunks[q].curr_size = _curr_size;
             _wchunks[q].right_max = _right_max;
             _wchunks[q].vect_size = vect.size();
-            _wchunks[q].test = test;
-
-            if ( _right_max > len_vect )
-            {
-                cout << "?????????" << endl;
-            }
-            //cout << "ls: " << _left_start << endl;
-            //cout << "cs: " << _curr_size << endl;
-            //cout << "rm: " << _right_max << endl;
-            //cout << "----" << endl;
 
             pthread_create( &_thread_handles[q], NULL, Pth_merge_sort_work_chunk, ( void * )&_wchunks[q]);
         }
 
-        for ( q = 0; q < NUM_THREADS; q++ )
+        for ( q = 0; q < NUM_THREADS - 1; q++ )
         {
             pthread_join( _thread_handles[q], NULL );
         }
     }
 
     delete[] _thread_handles;
+}
+
+template<class T>
+void merge_parallel( vector<T> &vect, vector<T> &vect_aux, long int _left, long int _mid, long int _right )
+{
+    long int q;
+
+    // prepare the aux array
+    for ( q = _left; q <= _right; q++  )
+    {
+        vect_aux[q] = vect[q];
+    }
+
+    long int p1 = _left;
+    long int p2 = _mid + 1;
+
+    //cout << "foo?" << endl;
+    for ( q = _left; q <=_right; q++ )
+    {
+        if ( p1 > _mid )
+        {
+            vect[q] = vect_aux[p2];
+            p2++;
+        }
+        else if ( p2 > _right )
+        {
+            vect[q] = vect_aux[p1];
+            p1++;
+        }
+        else if ( vect_aux[p2] < vect_aux[p1] )
+        {
+            vect[q] = vect_aux[p2];
+            p2++;
+        }
+        else
+        {
+            vect[q] = vect_aux[p1];
+            p1++;
+        }
+    }
+    //cout << "foo???" << endl;
 }
 
 
@@ -183,28 +203,11 @@ void merge( vector<T> &vect, long int _left, long int _mid, long int _right )
 
     for ( q = 0; q < _n1; q++ )
     {
-        if ( _left + q < 0 || _left + q >= vect.size() )
-        {
-            cout << "_left: " << _left << endl;
-            cout << "_mid: " << _mid << endl;
-            cout << "_right: " << _right << endl;
-            cout << "q: " << q << endl;
-            cout << "?: " << _left + q << " - " << vect.size() << " - " << vect[_left + q] << endl;
-        }
-        // cout << "?" << endl;
     	T _elem = vect[_left + q];
-        // cout << "????" << endl;
         _L.push_back( _elem );
     }
     for ( q = 0; q < _n2; q++ )
     {
-        if ( _mid + q + 1 < 0 || _mid + q + 1 >= vect.size() )
-        {
-            cout << "_left: " << _left << endl;
-            cout << "_mid: " << _mid << endl;
-            cout << "_right: " << _right << endl;
-            cout << "??: " << _mid + q + 1 << " - " << vect.size() << " - " << vect[_mid + q + 1] << endl;
-        }
     	T _elem = vect[_mid + q + 1];
         _R.push_back( _elem );
     }
@@ -257,46 +260,9 @@ void print_vector( vector<T> &vect )
 
 int main()
 { 
-    cout << "testing serial merge_sort ******" << endl;
-    for ( int q = 1; q <= VECT_SIZE; q++ )
-    {
-        g_arr.push_back( q );
-    }
-    random_shuffle( g_arr.begin(), g_arr.end() );
+    double _t1, _t2;
 
-    //print_vector( g_arr );
-    double _t1 = omp_get_wtime();
-    merge_sort<double>( g_arr );
-    double _t2 = omp_get_wtime();
-    //print_vector( g_arr );
-
-    double serial_time = _t2 - _t1;
-
-    cout << "time: " << _t2 - _t1 << endl;
-    cout << "isok: " << ( isSorted<double>( g_arr ) ? "yes" : "no" ) << endl;
-    cout << "********************************" << endl;
-    cout << "testing parallel merge_sort ****" << endl;
-
-    random_shuffle( g_arr.begin(), g_arr.end() );
-
-    //print_vector( g_arr );
-    _t1 = omp_get_wtime();
-    merge_sort_parallel<double>( g_arr );
-    _t2 = omp_get_wtime();
-    //print_vector( g_arr );
-   
-    double parallel_time = _t2 - _t1;
-
-    cout << "time: " << _t2 - _t1 << endl;
-
-    cout << "speedup: " << serial_time / parallel_time << endl;
-    cout << "efficiency: " << ( serial_time / parallel_time ) / ( NUM_THREADS ) << endl;
-    cout << "isok: " << ( isSorted<double>( g_arr ) ? "yes" : "no" ) << endl;
-    cout << "********************************" << endl;
-    
     cout << "reading from file ... " << endl;
-    
-    g_arr = vector<double>();
 
     ifstream _file;
     _file.open( "list.txt" );
@@ -323,32 +289,17 @@ int main()
         cout << "couldn't open file" << endl;
     }
 
-    vector<double> _arr_db_cpy( g_arr );
-
+    g_arr_aux = g_arr;
     cout << "finished reading from file, size: " << g_arr.size() << endl;
-    cout << "sorting serial ..." << endl;
+    cout << "size aux: " << g_arr_aux.size() << endl;
 
-    _t1 = omp_get_wtime();
-    merge_sort<double>( _arr_db_cpy );
-    _t2 = omp_get_wtime();
-
-    serial_time = _t2 - _t1;
-    cout << "time: " << _t2 - _t1 << endl;
-    cout << "isok: " << ( isSorted<double>( _arr_db_cpy ) ? "yes" : "no" ) << endl;
     cout << "sorting parallel ..." << endl;
     _t1 = omp_get_wtime();
-    merge_sort_parallel<double>( g_arr, true );
+    merge_sort_parallel<double>( g_arr, g_arr_aux );
     _t2 = omp_get_wtime();
 
-    /// print_vector<double>( g_arr );
-
-    parallel_time = _t2 - _t1;
     cout << "time: " << _t2 - _t1 << endl;
 
-    cout << "speedup: " << serial_time / parallel_time << endl;
-    cout << "efficiency: " << ( serial_time / parallel_time ) / ( NUM_THREADS ) << endl;
-
-    cout << "isok?" << endl;
     bool isok = isSorted( g_arr );
 
     cout << "isok: " << ( isok ? "yes" : "no" ) << endl;
