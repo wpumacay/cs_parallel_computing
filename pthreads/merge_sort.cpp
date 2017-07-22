@@ -14,7 +14,7 @@
 using namespace std;
 
 #define VECT_SIZE 100
-#define NUM_THREADS 7
+#define NUM_THREADS 4
 
 #define SERIAL_TIME 43.218
 
@@ -136,11 +136,14 @@ void merge_sort_parallel( vector<T> &vect, vector<T> &vect_aux )
             _wchunks[q].curr_size = _curr_size;
             _wchunks[q].right_max = _right_max;
             _wchunks[q].vect_size = vect.size();
+        }
 
+        for ( q = 0; q < NUM_THREADS; q++ )
+        {
             pthread_create( &_thread_handles[q], NULL, Pth_merge_sort_work_chunk, ( void * )&_wchunks[q]);
         }
 
-        for ( q = 0; q < NUM_THREADS - 1; q++ )
+        for ( q = 0; q < NUM_THREADS; q++ )
         {
             pthread_join( _thread_handles[q], NULL );
         }
