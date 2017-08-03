@@ -11,26 +11,24 @@
 #include <string>
 #include <cstdlib>
 
+#define RANDOM() ( rand() / ( float )RAND_MAX )
+
 using namespace std;
 
-#define VECT_SIZE 100
 #define NUM_THREADS 4
-
-#define SERIAL_TIME 43.218
-
-// #define CUT_SIZE 1000000
-#define CUT_SIZE -1
+#define VECT_SIZE 10000000
 
 // GLOBAL ARRAY TO SORT
 vector<double> g_arr;
+vector<double> g_arr_serial;
 vector<double> g_arr_aux;
-vector<double> g_arr_db;
 
 template<class T>
-void merge( vector<T> &vect, long int _left, long int _mid, long int _right );
-template<class T>
-void merge_parallel( vector<T> &vect, vector<T> &vect_aux, long int _left, long int _mid, long int _right );
+void merge( vector<T> &vect, vector<T> &vect_aux, long int _left, long int _mid, long int _right );
 
+/*
+* Function to check if a vector is correctly sorted
+*/
 template<class T>
 bool isSorted( vector<T> &vect )
 {
@@ -45,8 +43,11 @@ bool isSorted( vector<T> &vect )
     return true;
 }
 
+/*
+* Function to check if a vector is correctly sorted
+*/
 template<class T>
-void merge_sort( vector<T> &vect )
+void merge_sort( vector<T> &vect, vector<T> &vect_aux )
 {
     long int _curr_size;
     long int _left_start;
@@ -60,14 +61,9 @@ void merge_sort( vector<T> &vect )
             long int _right_end = min( _left_start + 2 * _curr_size - 1, (long int)( vect.size() - 1 ) );
             if ( _right_end < _mid )
             {
-                // cout << "???: " << _left_start << " - " << _mid << " - " << _right_end << endl;
                 _mid = ( _left_start + _right_end ) / 2;
             }
-            if ( _right_end > vect.size() )
-            {
-                cout << "????: " << _right_end << endl;
-            }
-            merge( vect, _left_start, _mid, _right_end );
+            merge( vect, vect_aux, _left_start, _mid, _right_end );
         }
     }
 }
@@ -101,7 +97,7 @@ void* Pth_merge_sort_work_chunk( void* working_struct )
         {
             _mid = ( _left_start + _right_end ) / 2;
         }
-        merge_parallel( g_arr, g_arr_aux, _left_start, _mid, _right_end );
+        merge( g_arr, g_arr_aux, _left_start, _mid, _right_end );
     }
 }
 
@@ -153,7 +149,7 @@ void merge_sort_parallel( vector<T> &vect, vector<T> &vect_aux )
 }
 
 template<class T>
-void merge_parallel( vector<T> &vect, vector<T> &vect_aux, long int _left, long int _mid, long int _right )
+void merge( vector<T> &vect, vector<T> &vect_aux, long int _left, long int _mid, long int _right )
 {
     long int q;
 
@@ -190,64 +186,8 @@ void merge_parallel( vector<T> &vect, vector<T> &vect_aux, long int _left, long 
             p1++;
         }
     }
-    //cout << "foo???" << endl;
 }
 
-
-template<class T>
-void merge( vector<T> &vect, long int _left, long int _mid, long int _right )
-{
-    long int q;
-
-    long int _n1 = _mid - _left + 1;// size of left array
-    long int _n2 = _right - _mid;// size of right array
-
-    vector<T> _L, _R;
-
-    for ( q = 0; q < _n1; q++ )
-    {
-    	T _elem = vect[_left + q];
-        _L.push_back( _elem );
-    }
-    for ( q = 0; q < _n2; q++ )
-    {
-    	T _elem = vect[_mid + q + 1];
-        _R.push_back( _elem );
-    }
-
-    long int p1 = 0;
-    long int p2 = 0;
-    q = _left;
-
-    while( p1 < _n1 && p2 < _n2 )
-    {
-        if ( _L[p1] <= _R[p2] )
-        {
-            vect[q] = _L[p1];
-            p1++;
-        }
-        else
-        {
-            vect[q] = _R[p2];
-            p2++;
-        }
-        q++;
-    }
-
-    while ( p1 < _n1 )
-    {
-        vect[q] = _L[p1];
-        p1++;
-        q++;
-    }
-
-    while ( p2 < _n2 )
-    {
-        vect[q] = _R[p2];
-        p2++;
-        q++;
-    }
-}
 
 template<class T>
 void print_vector( vector<T> &vect )
@@ -263,6 +203,13 @@ void print_vector( vector<T> &vect )
 
 int main()
 { 
+
+    for ( int q = 0; q < VECT_SIZE; q++ )
+    {
+        g_arr.push_back( q );
+    }
+    std::random_shuffle( g_arr.begin(), g_arr.end() );
+
     double _t1, _t2;
 
     cout << "reading from file ... " << endl;
@@ -275,17 +222,9 @@ int main()
     {
         while( getline( _file, _line ) )
         {
-            if ( CUT_SIZE != -1 )
-            {
-                _count++;
-                if ( _count > CUT_SIZE )
-                {
-                    _file.close();
-                    break;
-                }
-            }
             g_arr.push_back( std::stod( _line ) );
         }
+        _file.close();
     }
     else
     {
@@ -293,8 +232,17 @@ int main()
     }
 
     g_arr_aux = g_arr;
+    g_arr_serial = g_arr;
+
     cout << "finished reading from file, size: " << g_arr.size() << endl;
-    cout << "size aux: " << g_arr_aux.size() << endl;
+
+    cout << "sorting serial   ..." << endl;
+
+    _t1 = omp_get_wtime();
+    merge_sort<double>( g_arr_serial, g_arr_aux );
+    _t2 = omp_get_wtime();
+
+    cout << "time: " << _t2 - _t1 << endl;
 
     cout << "sorting parallel ..." << endl;
     _t1 = omp_get_wtime();
@@ -306,9 +254,6 @@ int main()
     bool isok = isSorted( g_arr );
 
     cout << "isok: " << ( isok ? "yes" : "no" ) << endl;
-
-    //cout << "speedup: " << SERIAL_TIME / parallel_time << endl;
-    //cout << "efficiency: " << ( SERIAL_TIME / parallel_time ) / ( NUM_THREADS ) << endl;
 
     cout << "finished sorting ****************" << endl;
     
