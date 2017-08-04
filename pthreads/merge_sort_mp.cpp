@@ -90,61 +90,30 @@ void* Pth_merge_sort_work_chunk( void* working_struct )
     long int _curr_size  = _wchunk->curr_size;
     long int _right_max = _wchunk->right_max;
 
-    for ( _left_start = _wchunk->left_start; _left_start <= _right_max; _left_start += 2 * _curr_size )
-    {
-        long int _mid = _left_start + _curr_size - 1;
-            
-        long int _right_end = min( _left_start + 2 * _curr_size - 1, ( ( long int ) VECT_SIZE - 1 ) );
-
-        if ( _right_end < _mid )
-        {
-            _mid = ( _left_start + _right_end ) / 2;
-        }
-        merge<double*>( g_array, g_array_aux, _left_start, _mid, _right_end );
-    }
 }
 
 template<class T>
 void merge_sort_parallel( T vect, T vect_aux, DataType type )
 {
     long int _curr_size;
-    long int len_vect = VECT_SIZE;
-
-    pthread_t* _thread_handles = new pthread_t[NUM_THREADS];
-
-    for ( _curr_size = 1; _curr_size <= len_vect - 1; _curr_size = 2 * _curr_size )
+    long int _left_start;
+    #pragma omp parallel shared( vect,vect_aux ) private( _curr_size, _left_start )
+    for ( _curr_size = 1; _curr_size <= VECT_SIZE - 1; _curr_size = 2 * _curr_size )
     {
-
-        long int n_chunks_per_thread = ceil( ( (float)len_vect ) / ( NUM_THREADS * 2 * _curr_size ) );
-        long q;
-        WorkStruct _wchunks[NUM_THREADS];
-
-        for ( q = 0; q < NUM_THREADS; q++ )
+        #pragma omp for
+        for ( _left_start = 0; _left_start < VECT_SIZE - 1; _left_start += 2 * _curr_size )
         {
-            long int _left_start = 0 + q * n_chunks_per_thread * 2 * _curr_size;
-            if ( _left_start > VECT_SIZE - 1 )
+            long int _mid = _left_start + _curr_size - 1;
+            
+            long int _right_end = min( _left_start + 2 * _curr_size - 1, (long int)( VECT_SIZE - 1 ) );
+            if ( _right_end < _mid )
             {
-            	continue;
+                _mid = ( _left_start + _right_end ) / 2;
             }
-            long int _right_max = min( _left_start + n_chunks_per_thread * 2 * _curr_size - 1, ( ( long int ) VECT_SIZE - 1 ) );
-
-            _wchunks[q].left_start = _left_start;
-            _wchunks[q].curr_size = _curr_size;
-            _wchunks[q].right_max = _right_max;
-        }
-
-        for ( q = 0; q < NUM_THREADS; q++ )
-        {
-            pthread_create( &_thread_handles[q], NULL, Pth_merge_sort_work_chunk, ( void * )&_wchunks[q]);
-        }
-
-        for ( q = 0; q < NUM_THREADS; q++ )
-        {
-            pthread_join( _thread_handles[q], NULL );
+            merge<T>( vect, vect_aux, _left_start, _mid, _right_end );
         }
     }
 
-    delete[] _thread_handles;
 }
 
 template<class T>
