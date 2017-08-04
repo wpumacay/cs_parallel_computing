@@ -16,23 +16,32 @@
 using namespace std;
 
 #define NUM_THREADS 4
-#define VECT_SIZE 10000000
+#define VECT_SIZE 40000000
 
 // GLOBAL ARRAY TO SORT
 vector<double> g_arr;
 vector<double> g_arr_serial;
 vector<double> g_arr_aux;
 
+double g_array[VECT_SIZE];
+double g_array_aux[VECT_SIZE];
+
 template<class T>
-void merge( vector<T> &vect, vector<T> &vect_aux, long int _left, long int _mid, long int _right );
+void merge( T vect, T vect_aux, long int _left, long int _mid, long int _right );
+
+enum DataType
+{
+    ARRAY,
+    VECTOR
+};
 
 /*
 * Function to check if a vector is correctly sorted
 */
 template<class T>
-bool isSorted( vector<T> &vect )
+bool isSorted( T vect )
 {
-    for ( long int q = 0; q < vect.size() - 1; q++ )
+    for ( long int q = 0; q < VECT_SIZE - 1; q++ )
     {
         if ( vect[q] > vect[q+1] )
         {
@@ -47,23 +56,23 @@ bool isSorted( vector<T> &vect )
 * Function to check if a vector is correctly sorted
 */
 template<class T>
-void merge_sort( vector<T> &vect, vector<T> &vect_aux )
+void merge_sort( T vect, T vect_aux )
 {
     long int _curr_size;
     long int _left_start;
     
-    for ( _curr_size = 1; _curr_size <= vect.size() - 1; _curr_size = 2 * _curr_size )
+    for ( _curr_size = 1; _curr_size <= VECT_SIZE - 1; _curr_size = 2 * _curr_size )
     {
-        for ( _left_start = 0; _left_start < vect.size() - 1; _left_start += 2 * _curr_size )
+        for ( _left_start = 0; _left_start < VECT_SIZE - 1; _left_start += 2 * _curr_size )
         {
             long int _mid = _left_start + _curr_size - 1;
             
-            long int _right_end = min( _left_start + 2 * _curr_size - 1, (long int)( vect.size() - 1 ) );
+            long int _right_end = min( _left_start + 2 * _curr_size - 1, (long int)( VECT_SIZE - 1 ) );
             if ( _right_end < _mid )
             {
                 _mid = ( _left_start + _right_end ) / 2;
             }
-            merge( vect, vect_aux, _left_start, _mid, _right_end );
+            merge<T>( vect, vect_aux, _left_start, _mid, _right_end );
         }
     }
 }
@@ -75,6 +84,7 @@ struct WorkStruct
     int curr_size;
     int right_max;
     int vect_size;
+    DataType datatype;
 };
 
 void* Pth_merge_sort_work_chunk( void* working_struct )
@@ -86,6 +96,8 @@ void* Pth_merge_sort_work_chunk( void* working_struct )
     long int _right_max = _wchunk->right_max;
     long int _vect_size  = _wchunk->vect_size;
     long _rank = _wchunk->rank;
+    DataType _type = _wchunk->datatype;
+
 
     for ( _left_start = _wchunk->left_start; _left_start <= _right_max; _left_start += 2 * _curr_size )
     {
@@ -97,15 +109,22 @@ void* Pth_merge_sort_work_chunk( void* working_struct )
         {
             _mid = ( _left_start + _right_end ) / 2;
         }
-        merge( g_arr, g_arr_aux, _left_start, _mid, _right_end );
+        if ( _type == VECTOR )
+        {
+            merge<vector<double>&>( g_arr, g_arr_aux, _left_start, _mid, _right_end );
+        }
+        else
+        {
+            merge<double*>( g_array, g_array_aux, _left_start, _mid, _right_end );
+        }
     }
 }
 
 template<class T>
-void merge_sort_parallel( vector<T> &vect, vector<T> &vect_aux )
+void merge_sort_parallel( T vect, T vect_aux, DataType type )
 {
     long int _curr_size;
-    long int len_vect = vect.size();
+    long int len_vect = VECT_SIZE;
 
     pthread_t* _thread_handles = new pthread_t[NUM_THREADS];
 
@@ -131,7 +150,8 @@ void merge_sort_parallel( vector<T> &vect, vector<T> &vect_aux )
             _wchunks[q].left_start = _left_start;
             _wchunks[q].curr_size = _curr_size;
             _wchunks[q].right_max = _right_max;
-            _wchunks[q].vect_size = vect.size();
+            _wchunks[q].vect_size = VECT_SIZE;
+            _wchunks[q].datatype = type;
         }
 
         for ( q = 0; q < NUM_THREADS; q++ )
@@ -149,7 +169,7 @@ void merge_sort_parallel( vector<T> &vect, vector<T> &vect_aux )
 }
 
 template<class T>
-void merge( vector<T> &vect, vector<T> &vect_aux, long int _left, long int _mid, long int _right )
+void merge( T vect, T vect_aux, long int _left, long int _mid, long int _right )
 {
     long int q;
 
@@ -190,11 +210,11 @@ void merge( vector<T> &vect, vector<T> &vect_aux, long int _left, long int _mid,
 
 
 template<class T>
-void print_vector( vector<T> &vect )
+void print_vector( T vect )
 {
     // return;
     cout << "[ ";
-    for ( long int q = 0; q < vect.size(); q++ )
+    for ( long int q = 0; q < VECT_SIZE; q++ )
     {
         cout << vect[q] << " ";
     }
@@ -203,13 +223,6 @@ void print_vector( vector<T> &vect )
 
 int main()
 { 
-
-    for ( int q = 0; q < VECT_SIZE; q++ )
-    {
-        g_arr.push_back( q );
-    }
-    std::random_shuffle( g_arr.begin(), g_arr.end() );
-
     double _t1, _t2;
 
     cout << "reading from file ... " << endl;
@@ -223,6 +236,9 @@ int main()
         while( getline( _file, _line ) )
         {
             g_arr.push_back( std::stod( _line ) );
+            g_array[_count] = std::stod( _line );
+            g_array_aux[_count] = g_array[_count];
+            _count++;
         }
         _file.close();
     }
@@ -232,10 +248,9 @@ int main()
     }
 
     g_arr_aux = g_arr;
-    g_arr_serial = g_arr;
 
     cout << "finished reading from file, size: " << g_arr.size() << endl;
-
+    /*
     cout << "sorting serial   ..." << endl;
 
     _t1 = omp_get_wtime();
@@ -243,15 +258,25 @@ int main()
     _t2 = omp_get_wtime();
 
     cout << "time: " << _t2 - _t1 << endl;
-
+    */
     cout << "sorting parallel ..." << endl;
     _t1 = omp_get_wtime();
-    merge_sort_parallel<double>( g_arr, g_arr_aux );
+    merge_sort_parallel<vector<double>&>( g_arr, g_arr_aux, VECTOR );
     _t2 = omp_get_wtime();
 
     cout << "time: " << _t2 - _t1 << endl;
 
-    bool isok = isSorted( g_arr );
+    bool isok = isSorted<vector<double>&>( g_arr );
+
+    cout << "isok: " << ( isok ? "yes" : "no" ) << endl;
+
+    _t1 = omp_get_wtime();
+    merge_sort_parallel<double*>( g_array, g_array_aux, ARRAY );
+    _t2 = omp_get_wtime();
+
+    cout << "time: " << _t2 - _t1 << endl;
+
+    isok = isSorted<double*>( g_array );
 
     cout << "isok: " << ( isok ? "yes" : "no" ) << endl;
 
