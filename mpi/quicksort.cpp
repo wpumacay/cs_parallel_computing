@@ -8,11 +8,12 @@
 #include <pthread.h>
 #include <omp.h>
 #include <mpi.h>
+#include <unistd.h>
 
 using namespace std;
 
-#define VECT_SIZE   10000000
-#define BUCKET_SIZE 5000000
+#define VECT_SIZE   100000000
+#define BUCKET_SIZE 50000000
 #define NUM_PROCESSES 2
 #define NUM_THREADS 2
 
@@ -24,17 +25,17 @@ double g_bucket[BUCKET_SIZE];
 double g_bucket_bp[BUCKET_SIZE];
 
 double g_median;
-int g_median_indx;
+long int g_median_indx;
 
 struct PthData
 {
-    int left;
-    int right;
+    long int left;
+    long int right;
 };
 
-void printArray( double* arr, int size )
+void printArray( double* arr, long int size )
 {
-    for ( int q = 0; q < size; q++ )
+    for ( long int q = 0; q < size; q++ )
     {
         cout << arr[q] << " ";
     }
@@ -81,7 +82,7 @@ void merge( long int _left, long int _mid, long int _right )
     }
 }
 
-int partitionHoare( int &left, int &right, int medianIndx = -1 )
+long int partitionHoare( long int &left, long int &right, long int medianIndx = -1 )
 {   
     if ( medianIndx != -1 )
     {
@@ -89,8 +90,8 @@ int partitionHoare( int &left, int &right, int medianIndx = -1 )
         g_bucket[left] = g_median;
     }
 
-    int p1 = left + 1;
-    int p2 = right;
+    long int p1 = left + 1;
+    long int p2 = right;
 
     while ( true )
     {
@@ -98,11 +99,19 @@ int partitionHoare( int &left, int &right, int medianIndx = -1 )
         while ( g_bucket[p1] < g_bucket[left] )
         {
             p1++;
+            if ( p1 >= right )
+            {
+                break;
+            }
         }
 
         while( g_bucket[p2] > g_bucket[left] )
         {
             p2--;
+            if ( p2 <= left )
+            {
+                break;
+            }
         }
 
         if ( p1 >= p2 )
@@ -124,7 +133,7 @@ int partitionHoare( int &left, int &right, int medianIndx = -1 )
     return p2;
 }
 
-void quicksort( int left, int right )
+void quicksort( long int left, long int right )
 {
     if ( right <= left )
     {
@@ -132,19 +141,19 @@ void quicksort( int left, int right )
     }
 
 //    int _mid = partitionLomuto( arr, left, right );
-    int _mid = partitionHoare( left, right );
+    long int _mid = partitionHoare( left, right );
     quicksort( left, _mid - 1 );
     quicksort( _mid + 1, right );
 }
 
-void quicksort_parallel_normal( int left, int right )
+void quicksort_parallel_normal( long int left, long int right )
 {
     if ( right <= left )
     {
         return;
     }
 
-    int _mid = partitionHoare( left, right );
+    long int _mid = partitionHoare( left, right );
     quicksort_parallel_normal( left, _mid - 1 );
     quicksort_parallel_normal( _mid + 1, right );
 }
@@ -158,11 +167,11 @@ void* Pth_quicksort( void* data )
     return NULL;
 }
 
-void quicksort_parallel_stage1( int left, int right )
+void quicksort_parallel_stage1( long int left, long int right )
 {
     // Create pthreads for each partition
     
-    int _mid = partitionHoare( left, right, g_median_indx );
+    long int _mid = partitionHoare( left, right, g_median_indx );
 
     pthread_t* thread_handles = new pthread_t[2];
 
@@ -184,7 +193,7 @@ void quicksort_parallel_stage1( int left, int right )
 
 bool isSorted( double* vect )
 {
-    for ( int q = 0; q < VECT_SIZE - 1; q++ )
+    for ( long int q = 0; q < VECT_SIZE - 1; q++ )
     {
         if ( vect[q] > vect[q+1] )
         {
@@ -206,7 +215,13 @@ int main()
     MPI_Comm_size( MPI_COMM_WORLD, &_comm_size );
     MPI_Comm_rank( MPI_COMM_WORLD, &_my_rank );
 
-    int N = VECT_SIZE / _comm_size;
+    pid_t id = getpid();
+
+    cout << "pid: " << id << endl;
+
+    // sleep( 20 );
+
+    long int N = VECT_SIZE / _comm_size;
 
     if ( N != BUCKET_SIZE || NUM_PROCESSES != _comm_size )
     {
@@ -226,6 +241,7 @@ int main()
         _file.open( "../list.txt" );
         string _line;
         int _count = 0;
+        int _hundreds = 0;
         if ( _file.is_open() )
         {
             cout << "file openened" << endl;
@@ -233,6 +249,10 @@ int main()
             {
                 g_arr[_count] = std::stod( _line );
                 _count++;
+                if ( _count % 1000000 == 0 )
+                {
+                    cout << "millions read: " << _hundreds++ << endl;
+                }
                 if ( _count == VECT_SIZE )
                 {
                     break;
@@ -251,6 +271,8 @@ int main()
                      g_bucket, N, MPI_DOUBLE, MASTER_RANK, MPI_COMM_WORLD );
 
         // printArray( g_arr, VECT_SIZE );
+
+        // sleep( 10 );
     }
     else
     {
@@ -280,7 +302,7 @@ int main()
     //nth_element( _my_arr_bp, _my_arr_bp + N / 2, _my_arr_bp + N - 1 );
     //g_median = _my_arr_bp[N / 2];
 
-    for ( int q = 0; q < N; q++ )
+    for ( long int q = 0; q < N; q++ )
     {
         if ( g_bucket[q] == g_median )
         {
