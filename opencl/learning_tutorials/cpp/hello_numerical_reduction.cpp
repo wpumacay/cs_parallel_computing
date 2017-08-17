@@ -10,7 +10,7 @@ using namespace std;
 
 #include "utils.h"
 
-#define VEC_SIZE 1024
+#define VEC_SIZE 2048
 
 int main()
 {
@@ -30,7 +30,9 @@ int main()
     cl::Context _context( _device );
     // ****************************************************
 
-    cl::Program _program = utils::createProgram( _context, _device, string( "kernel_numerical_reduction.cl" ) );
+    cl::Program _program = utils::createProgram( _context, 
+                                                 _device, 
+                                                 string( "../cl/kernel_numerical_reduction.cl" ) );
 
     cl::Kernel _kernel( _program, "numericalReduction" );
 

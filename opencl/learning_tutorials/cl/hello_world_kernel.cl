@@ -15,4 +15,5 @@ __kernel void HelloWorld( __global char* data )
     data[10] = 'd';
     data[11] = '!';
     data[12] = '\n';
+    data[13] = '\0';
 }

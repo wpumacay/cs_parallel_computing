@@ -10,8 +10,6 @@
 
 using namespace std;
 
-#define DEV_STR_BUFF 1000
-
 
 int main()
 {
@@ -36,7 +34,7 @@ int main()
     
     cout << "devInfo-name: " << _devInfo << endl;
 
-    ifstream _hwFile( "hello_world_kernel.cl" );
+    ifstream _hwFile( "../cl/hello_world_kernel.cl" );
 
     string _srcKernel;
     string _tmp;

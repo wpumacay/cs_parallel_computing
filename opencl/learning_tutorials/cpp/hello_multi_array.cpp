@@ -32,7 +32,9 @@ int main()
     cl::Context _context( _device );
     // ****************************************************
 
-    cl::Program _program = utils::createProgram( _context, string( "hello_multi_array_kernel.cl" ) );
+    cl::Program _program = utils::createProgram( _context, 
+                                                 _device,
+                                                 string( "../cl/hello_multi_array_kernel.cl" ) );
     
     const int NUM_ROWS = 3;
     const int NUM_COLS = 2;
@@ -46,6 +48,9 @@ int main()
     _arr[1 * NUM_COLS + 1] = 2;
     _arr[2 * NUM_COLS + 0] = 3;
     _arr[2 * NUM_COLS + 1] = 3;
+
+    utils::print2dMat<int>( _arr, NUM_COLS, NUM_ROWS );
+    cout << endl;
 
     cl::Buffer d_in_buff( _context,  
                           CL_MEM_READ_WRITE |

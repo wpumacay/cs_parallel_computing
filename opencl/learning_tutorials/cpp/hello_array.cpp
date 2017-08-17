@@ -50,7 +50,8 @@ int main()
     // ****************************************************
 
     cl::Program _program = utils::createProgram( _context, 
-                                                 string( "hello_array_kernel.cl" ) );
+                                                 _device,
+                                                 string( "../cl/hello_array_kernel.cl" ) );
 
     
     vector<int> _vec( VECTOR_SIZE );
