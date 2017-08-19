@@ -25,13 +25,7 @@ double g_array_aux[VECT_SIZE];
 double g_array_serial[VECT_SIZE];
 
 template<class T>
-void merge( T vect, T vect_aux, long int _left, long int _mid, long int _right );
-
-enum DataType
-{
-    ARRAY,
-    VECTOR
-};
+void merge( long int _left, long int _mid, long int _right );
 
 /*
 * Function to check if a vector is correctly sorted
@@ -54,7 +48,7 @@ bool isSorted( T vect )
 * Function to check if a vector is correctly sorted
 */
 template<class T>
-void merge_sort( T vect, T vect_aux )
+void merge_sort()
 {
     long int _curr_size;
     long int _left_start;
@@ -70,7 +64,7 @@ void merge_sort( T vect, T vect_aux )
             {
                 _mid = ( _left_start + _right_end ) / 2;
             }
-            merge<T>( vect, vect_aux, _left_start, _mid, _right_end );
+            merge<T>( _left_start, _mid, _right_end );
         }
     }
 }
@@ -100,12 +94,12 @@ void* Pth_merge_sort_work_chunk( void* working_struct )
         {
             _mid = ( _left_start + _right_end ) / 2;
         }
-        merge<double*>( g_array, g_array_aux, _left_start, _mid, _right_end );
+        merge<double*>( _left_start, _mid, _right_end );
     }
 }
 
 template<class T>
-void merge_sort_parallel( T vect, T vect_aux, DataType type )
+void merge_sort_parallel()
 {
     long int _curr_size;
     long int len_vect = VECT_SIZE;
@@ -148,14 +142,15 @@ void merge_sort_parallel( T vect, T vect_aux, DataType type )
 }
 
 template<class T>
-void merge( T vect, T vect_aux, long int _left, long int _mid, long int _right )
+void merge( long int _left, long int _mid, long int _right )
 {
     long int q;
 
     // prepare the aux array
+    // #pragma omp parallel for shared( g_array, g_array_aux, _left, _right ) private( q )
     for ( q = _left; q <= _right; q++  )
     {
-        vect_aux[q] = vect[q];
+        g_array_aux[q] = g_array[q];
     }
 
     long int p1 = _left;
@@ -166,22 +161,22 @@ void merge( T vect, T vect_aux, long int _left, long int _mid, long int _right )
     {
         if ( p1 > _mid )
         {
-            vect[q] = vect_aux[p2];
+            g_array[q] = g_array_aux[p2];
             p2++;
         }
         else if ( p2 > _right )
         {
-            vect[q] = vect_aux[p1];
+            g_array[q] = g_array_aux[p1];
             p1++;
         }
-        else if ( vect_aux[p2] < vect_aux[p1] )
+        else if ( g_array_aux[p2] < g_array_aux[p1] )
         {
-            vect[q] = vect_aux[p2];
+            g_array[q] = g_array_aux[p2];
             p2++;
         }
         else
         {
-            vect[q] = vect_aux[p1];
+            g_array[q] = g_array_aux[p1];
             p1++;
         }
     }
@@ -207,7 +202,7 @@ int main()
     cout << "reading from file ... " << endl;
 
     ifstream _file;
-    _file.open( "list.txt" );
+    _file.open( "../list.txt" );
     string _line;
     int _count = 0;
     if ( _file.is_open() )
@@ -228,10 +223,10 @@ int main()
 
     cout << "finished reading from file, size: " << VECT_SIZE << endl;
 
-    cout << "sorting parallel ..." << endl;
+    cout << "sorting serial   ..." << endl;
 
     _t1 = omp_get_wtime();
-    merge_sort<double*>( g_array_serial, g_array_aux );
+    merge_sort<double*>();
     _t2 = omp_get_wtime();
 
     double serialtime = _t2 - _t1;
@@ -240,8 +235,15 @@ int main()
 
     cout << "sorting parallel ..." << endl;
 
+    for ( long int q = 0; q < VECT_SIZE; q++ )
+    {
+        g_array[q] = g_array_serial[q];
+    }
+
+    omp_set_num_threads( NUM_THREADS );
+
     _t1 = omp_get_wtime();
-    merge_sort_parallel<double*>( g_array, g_array_aux, ARRAY );
+    merge_sort_parallel<double*>();
     _t2 = omp_get_wtime();
 
     double paralleltime = _t2 - _t1;

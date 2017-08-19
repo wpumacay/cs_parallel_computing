@@ -13,22 +13,19 @@ using namespace std;
 #define VECT_SIZE 100000000
 #define NUM_THREADS 2
 
-#define POOL_SIZE 8
+double g_arr[VECT_SIZE];
+double g_arr_bp[VECT_SIZE];
 
-long long int g_arr[VECT_SIZE];
-long long int g_arr_bp[VECT_SIZE];
-
-long long int g_median;
+double g_median;
 int g_median_indx;
 
 struct PthData
 {
     int left;
     int right;
-    bool isLeft;
 };
 
-void printArray( long long int* arr, int size )
+void printArray( double* arr, int size )
 {
     for ( int q = 0; q < size; q++ )
     {
@@ -55,11 +52,19 @@ int partitionHoare( int &left, int &right, int medianIndx = -1 )
         while ( g_arr[p1] < g_arr[left] )
         {
             p1++;
+            if ( p1 >= right )
+            {
+                break;
+            }
         }
 
         while( g_arr[p2] > g_arr[left] )
         {
             p2--;
+            if ( p2 <= left )
+            {
+                break;
+            }
         }
 
         if ( p1 >= p2 )
@@ -68,13 +73,13 @@ int partitionHoare( int &left, int &right, int medianIndx = -1 )
         }
         
         // Swap
-        long long int _tmp = g_arr[p1];
+        double _tmp = g_arr[p1];
         g_arr[p1] = g_arr[p2];
         g_arr[p2] = _tmp;
     }
 
     // Swap the pivot
-    long long int _tmp = g_arr[left];
+    double _tmp = g_arr[left];
     g_arr[left] = g_arr[p2];
     g_arr[p2] = _tmp;
 
@@ -139,9 +144,9 @@ void quicksort_parallel_stage1( int left, int right )
     
 }
 
-bool isSorted( long long int* vect )
+bool isSorted( double* vect )
 {
-    for ( long long int q = 0; q < VECT_SIZE - 1; q++ )
+    for ( int q = 0; q < VECT_SIZE - 1; q++ )
     {
         if ( vect[q] > vect[q+1] )
         {
@@ -163,7 +168,7 @@ int main()
         cout << "file openened" << endl;
         while( getline( _file, _line ) )
         {
-            g_arr[_count] = g_arr_bp[_count] = ( ( long long int ) ( 1000000000000000. * std::stod( _line ) ) );
+            g_arr[_count] = g_arr_bp[_count] = std::stod( _line );
             _count++;
             if ( _count == VECT_SIZE )
             {
