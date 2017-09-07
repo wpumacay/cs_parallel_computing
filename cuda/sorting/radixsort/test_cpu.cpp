@@ -5,7 +5,7 @@
 
 using namespace std;
 
-#define VECT_SIZE 100
+#define VECT_SIZE 33
 #define RAND_INT(x) rand() % x
 
 int g_arr[VECT_SIZE];
@@ -34,7 +34,8 @@ int main()
     
     for ( int q = 0; q < VECT_SIZE; q++ )
     {
-        g_arr[q] = RAND_INT( VECT_SIZE );
+        //g_arr[q] = RAND_INT( VECT_SIZE );
+        g_arr[q] = VECT_SIZE - q;
     }
     
 
@@ -90,7 +91,8 @@ void radixsort::partition( int *arr, int *arrOut, int size, int bit )
         tScanBuff[tIndx] = s;
     }/* Here we should use a parallel scan implementation */
 
-    // printArray( tScanBuff, size );
+    cout << "scan - bit: " << bit << endl;
+    printArray( tScanBuff, size );
 
     int numZeros = tScanBuff[size - 1] + tBuff[size - 1];
 
