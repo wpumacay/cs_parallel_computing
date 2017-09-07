@@ -1,13 +1,17 @@
 
 #include <iostream>
+#include <fstream>
+#include <string>
 #include <cmath>
 #include <cstdlib>
 #include <thrust/scan.h>
 #include <thrust/execution_policy.h>
+#include "timer.h"
 
 using namespace std;
 
-#define VECT_SIZE 10000000
+#define VECT_SIZE 50000000
+#define MAX_NUMBER 100000000.0
 #define RAND_INT(x) rand() % x
 
 #define CUDA_THREADS_PER_BLOCK 1024
@@ -20,6 +24,10 @@ int h_arrScan[VECT_SIZE];
 int h_arrSums[NUM_SUMS];
 
 //#define TEST_SCAN 1
+
+#ifndef TEST_SCAN
+    #define USE_THRUST 1
+#endif
 
 template<class T>
 void printArray( T* arr, int size, int offset = 0 )
@@ -199,11 +207,44 @@ int main()
 {
     cudaDeviceReset();
 
-    for ( int q = 0; q < VECT_SIZE; q++ )
+    // Read input file ******************************
+
+    ifstream _file;
+    _file.open( "../../../list.txt" );
+    string _line;
+    int _count = 0;
+    int _millions = 0;
+    if ( _file.is_open() )
     {
-        //h_arr[q] = h_arrOut[q] = RAND_INT( VECT_SIZE );
-        h_arr[q] = h_arrOut[q] = VECT_SIZE - q;
+        cout << "file openened" << endl;
+        while( getline( _file, _line ) )
+        {
+            float _numf = std::stof( _line );
+            h_arr[_count] = ( ( int ) ( _numf * MAX_NUMBER ) );
+            _count++;
+            if ( _count % 1000000 == 0 )
+            {
+                cout << "millions read: " << _millions++ << endl;
+            }
+            if ( _count == VECT_SIZE )
+            {
+                break;
+            }
+        }
+        _file.close();
     }
+    else
+    {
+        cout << "couldn't open file" << endl;
+    }
+
+    // **********************************************
+
+    //for ( int q = 0; q < VECT_SIZE; q++ )
+    //{
+    //    //h_arr[q] = h_arrOut[q] = RAND_INT( VECT_SIZE );
+    //    h_arr[q] = h_arrOut[q] = VECT_SIZE - q;
+    //}
 
     int* d_arr;
     cudaMalloc( &d_arr , sizeof( int ) * VECT_SIZE );
@@ -226,11 +267,11 @@ int main()
 
     cout << "nBlocks: " << nBlocks << endl;
     cout << "nThreads: " << nThreads << endl;
-
+#ifndef USE_THRUST
     int* d_sums;
     cudaMalloc( &d_sums, sizeof( int ) * nBlocks );
     cudaMemset( d_sums, 0, sizeof( int ) * nBlocks );
-
+#endif
     int size = VECT_SIZE;
     int nbits = ceil( log2( size ) );
     int wsize = 1 << nbits;
@@ -238,6 +279,7 @@ int main()
     {
         nbits++;
     }
+    nbits = ceil( log2( MAX_NUMBER ) );
 
     cout << "size: " << size << endl;
     cout << "wsize: " << wsize << endl;
@@ -279,6 +321,9 @@ int main()
 
     cout << "free memory: " << _mem_free << endl;
     cout << "total memory: " << _mem_total << endl;
+
+    GpuTimer _timer;
+    _timer.start();
 
     for ( int bit = 0; bit < nbits; bit++ )
     {
@@ -327,14 +372,21 @@ int main()
         
     }
 
+    _timer.stop();
+
+    float _elapsedTime = _timer.elapsed();
+
     cudaMemcpy( h_arrOut, d_arrOut, sizeof( int ) * VECT_SIZE, cudaMemcpyDeviceToHost );
 
     
     bool _isOk = isSorted<int>( h_arrOut, VECT_SIZE );
     cout << "isSorted: " << ( _isOk ? "yes" : "no" ) << endl;
 
-    printArray<int>( h_arrOut, 100 );
+    printArray<int>( h_arrOut, 100, 0 );
+    printArray<int>( h_arrOut, 100, VECT_SIZE - 101 );
     
+    cout << "time: " << _elapsedTime << endl;
+
     cudaMemGetInfo( &_mem_free, &_mem_total );
 
     cout << "free memory: " << _mem_free << endl;
@@ -346,7 +398,9 @@ int main()
     cudaFree( d_arrOut );
     cudaFree( d_scan );
     cudaFree( d_indxBuff );
+#ifndef USE_THRUST
     cudaFree( d_sums );
+#endif
 
     return 0;
 }
